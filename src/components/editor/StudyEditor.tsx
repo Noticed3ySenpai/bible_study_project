@@ -14,7 +14,6 @@ import "@blocknote/core/fonts/inter.css";
 import "@blocknote/ariakit/style.css";
 import "./study-editor.css";
 import { studyEditorSchema } from "./verse-chip-schema";
-import { VersePicker } from "@/components/bible/VersePicker";
 import { useStudyOptional } from "@/components/study/StudyContext";
 import type { VerseBlockInsertRef } from "@/components/study/StudyContext";
 import { BIBLE_BOOKS } from "@/lib/bible-books";
@@ -140,22 +139,22 @@ export default function StudyEditor({
 );
 
   return (
-    <div className="study-editor">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <VersePicker onSelect={insertVerse} />
-        <span className="text-xs text-stone-400">
+    <div className="study-editor relative flex h-full min-h-0 flex-col">
+      {saveState !== "idle" && (
+        <span className="pointer-events-none absolute right-3 top-3 z-10 text-xs text-stone-400">
           {saveState === "saving" && "Saving…"}
           {saveState === "saved" && "Saved"}
           {saveState === "error" && "Save failed"}
         </span>
-      </div>
-      <BlockNoteView
-        editor={editor}
-        editable={editable}
-        theme="light"
-        formattingToolbar={false}
-        onChange={() => scheduleSave(editor.document)}
-      >
+      )}
+      <div className="min-h-0 flex-1">
+        <BlockNoteView
+          editor={editor}
+          editable={editable}
+          theme="light"
+          formattingToolbar={false}
+          onChange={() => scheduleSave(editor.document)}
+        >
         <FormattingToolbar>
           <BlockTypeSelect key="blockTypeSelect" />
           <BasicTextStyleButton basicTextStyle="bold" key="bold" />
@@ -169,6 +168,7 @@ export default function StudyEditor({
           }
         />
       </BlockNoteView>
+      </div>
     </div>
   );
 }

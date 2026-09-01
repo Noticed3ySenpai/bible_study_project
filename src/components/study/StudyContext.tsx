@@ -99,10 +99,15 @@ export function StudyProvider({
   const selectVerse = useCallback(
     (osisRef: string | null) => {
       if (osisRef) {
-        setBibleOpen(true);
         setSelectedVerse(osisRef);
         setConcordanceOpen(true);
         setHoveredStrongs(null);
+        if (
+          typeof window !== "undefined" &&
+          window.matchMedia("(max-width: 767px)").matches
+        ) {
+          setBibleOpen(false);
+        }
       } else {
         closeConcordance();
       }

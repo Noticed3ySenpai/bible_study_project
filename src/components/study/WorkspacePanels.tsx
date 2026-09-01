@@ -23,7 +23,7 @@ function MobilePanelSheet({
         aria-label="Close panel"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-2xl bg-white shadow-2xl">
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-2xl bg-stone-100 shadow-2xl">
         <div className="flex justify-center py-2">
           <div className="h-1 w-10 rounded-full bg-stone-300" />
         </div>
@@ -64,7 +64,7 @@ export function WorkspacePanels({
       <div className="relative flex min-h-0 flex-1">
         {notesPanel && (
           <section
-            className={`${panelWidth} min-h-0 overflow-y-auto border-stone-200 ${
+            className={`${panelWidth} flex min-h-0 flex-col border-stone-200 bg-white ${
               bibleVisible || concordanceOpen ? "md:border-r" : ""
             }`}
           >
@@ -83,7 +83,7 @@ export function WorkspacePanels({
         )}
 
         {concordanceOpen && (
-          <aside className={`${panelWidth} hidden min-h-0 md:block`}>
+          <aside className={`${panelWidth} hidden min-h-0 bg-stone-100/50 md:block`}>
             <ConcordancePanel onNavigateVerse={onNavigateVerse} />
           </aside>
         )}

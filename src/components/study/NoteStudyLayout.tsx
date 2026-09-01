@@ -70,7 +70,7 @@ function NoteStudyLayoutInner({
         bibleBookId={book.id}
         bibleChapter={bibleLoc.chapter}
         onNavigateVerse={handleNavigateVerse}
-        notesPanel={<div className="px-4 py-4 md:px-6">{children}</div>}
+        notesPanel={<div className="flex h-full min-h-0 flex-col">{children}</div>}
       />
     </div>
   );
