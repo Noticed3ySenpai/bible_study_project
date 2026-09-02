@@ -40,7 +40,7 @@ function NoteStudyLayoutInner({
   }, [bibleLoc]);
 
   const handleNavigateVerse = useCallback(
-    (bookOsis: string, chapter: number) => {
+    (bookOsis: string, chapter: number, _osisRef?: string) => {
       openBible();
       setBibleLoc({ bookOsis, chapter });
     },

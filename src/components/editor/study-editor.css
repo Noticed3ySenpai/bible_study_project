@@ -136,6 +136,17 @@
   background: rgb(254 243 199);
 }
 
+@media (max-width: 767px) {
+  body[data-mobile-panel-open] main {
+    overflow: hidden;
+  }
+
+  body[data-mobile-panel-open] .study-editor .bn-editor {
+    overflow: hidden;
+    touch-action: none;
+  }
+}
+
 @media (max-width: 640px) {
   .study-editor .bn-formatting-toolbar {
     flex-wrap: wrap;

@@ -48,7 +48,7 @@ export function BiblePanel({
   }, [ready, bookId, chapter, chapterKey, getChapter, getVerseWords]);
 
   return (
-    <article className="h-full overflow-y-auto px-4 py-4 md:px-6">
+    <article className="h-full min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 md:px-6">
       {loading ? (
         <p className="text-stone-500">Loading chapter…</p>
       ) : (

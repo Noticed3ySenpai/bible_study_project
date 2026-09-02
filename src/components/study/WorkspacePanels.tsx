@@ -1,8 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
 import { BiblePanel } from "./BiblePanel";
 import { ConcordancePanel } from "./ConcordancePanel";
 import { useStudy } from "./StudyContext";
+
+function useMobilePanelScrollLock(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    if (!isMobile) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    document.body.dataset.mobilePanelOpen = "true";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
+      delete document.body.dataset.mobilePanelOpen;
+    };
+  }, [open]);
+}
 
 function MobilePanelSheet({
   open,
@@ -13,6 +35,8 @@ function MobilePanelSheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  useMobilePanelScrollLock(open);
+
   if (!open) return null;
 
   return (
@@ -23,11 +47,16 @@ function MobilePanelSheet({
         aria-label="Close panel"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-2xl bg-stone-100 shadow-2xl">
-        <div className="flex justify-center py-2">
+      <div
+        className="absolute inset-x-0 bottom-0 flex h-[85vh] max-h-[85vh] flex-col rounded-t-2xl bg-stone-100 shadow-2xl"
+        onTouchMove={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 justify-center py-2">
           <div className="h-1 w-10 rounded-full bg-stone-300" />
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <div className="min-h-0 flex-1 overflow-hidden overscroll-contain touch-pan-y">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -43,7 +72,7 @@ export function WorkspacePanels({
   bibleBookId: number;
   bibleChapter: number;
   showBible?: boolean;
-  onNavigateVerse: (book: string, chapter: number) => void;
+  onNavigateVerse: (book: string, chapter: number, osisRef?: string) => void;
   notesPanel?: React.ReactNode;
 }) {
   const { bibleOpen, concordanceOpen, closeBible, closeConcordance } = useStudy();
@@ -66,7 +95,7 @@ export function WorkspacePanels({
           <section
             className={`${panelWidth} flex min-h-0 flex-col border-stone-200 bg-white ${
               bibleVisible || concordanceOpen ? "md:border-r" : ""
-            }`}
+            } ${bibleOpen || concordanceOpen ? "max-md:overflow-hidden max-md:touch-none" : ""}`}
           >
             {notesPanel}
           </section>

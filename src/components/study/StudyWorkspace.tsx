@@ -20,7 +20,7 @@ function StudyWorkspaceInner({
 }) {
   const router = useRouter();
 
-  const handleNavigateVerse = (book: string, targetChapter: number) => {
+  const handleNavigateVerse = (book: string, targetChapter: number, _osisRef?: string) => {
     router.push(`/read/${book.toLowerCase()}/${targetChapter}`);
   };
 

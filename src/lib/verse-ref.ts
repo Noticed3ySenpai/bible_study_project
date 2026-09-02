@@ -24,6 +24,17 @@ export function formatVerseRef(ref: VerseRef, book?: BibleBook): string {
   return `${name} ${ref.chapter}:${verses}`;
 }
 
+export function parseOsisVerse(
+  osisRef: string
+): { book: string; chapter: number; verse: number } | null {
+  const [book, chapter, verse] = osisRef.split(".");
+  if (!book || !chapter || !verse) return null;
+  const chapterNum = Number(chapter);
+  const verseNum = Number(verse);
+  if (!Number.isFinite(chapterNum) || !Number.isFinite(verseNum)) return null;
+  return { book, chapter: chapterNum, verse: verseNum };
+}
+
 export function parseVerseRef(input: string): VerseRef | null {
   const trimmed = input.trim();
   const match = trimmed.match(

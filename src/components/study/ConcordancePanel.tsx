@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getAdjacentVerseOsis } from "@/lib/adjacent-verse";
 import { useBibleDb, type CrossRef, type LexiconEntry, type Verse } from "@/lib/bible-db";
 import { BOOK_BY_OSIS } from "@/lib/bible-books";
 import { morphologyLabel, parseRootStrongs } from "@/lib/verse-alignment";
-import { formatVerseRef } from "@/lib/verse-ref";
+import { formatVerseRef, parseOsisVerse } from "@/lib/verse-ref";
 import { useStudy } from "./StudyContext";
 import { ConcordanceVerseWords } from "./ConcordanceVerseWords";
 import { verseLabelFromOsis } from "./StudyTopBar";
@@ -81,10 +82,11 @@ function CollapsibleStudyCard({
 export function ConcordancePanel({
   onNavigateVerse,
 }: {
-  onNavigateVerse: (book: string, chapter: number) => void;
+  onNavigateVerse: (book: string, chapter: number, osisRef?: string) => void;
 }) {
-  const { selectedVerse, hoveredStrongs, closeConcordance, setHoveredStrongs } = useStudy();
-  const { getLexiconEntry, getStrongsOccurrences, getCrossReferences, getVerseWords } =
+  const { selectedVerse, hoveredStrongs, closeConcordance, setHoveredStrongs, selectVerse } =
+    useStudy();
+  const { getLexiconEntry, getStrongsOccurrences, getCrossReferences, getVerseWords, getChapter } =
     useBibleDb();
 
   const [lexicon, setLexicon] = useState<LexiconEntry | null>(null);
@@ -92,6 +94,25 @@ export function ConcordancePanel({
   const [crossRefs, setCrossRefs] = useState<CrossRef[]>([]);
   const [hasWordStudy, setHasWordStudy] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [navigatingVerse, setNavigatingVerse] = useState(false);
+
+  const navigateAdjacentVerse = useCallback(
+    async (direction: "prev" | "next") => {
+      if (!selectedVerse || navigatingVerse) return;
+      setNavigatingVerse(true);
+      try {
+        const nextOsis = await getAdjacentVerseOsis(selectedVerse, direction, getChapter);
+        if (!nextOsis) return;
+        const parsed = parseOsisVerse(nextOsis);
+        if (!parsed) return;
+        onNavigateVerse(parsed.book, parsed.chapter, nextOsis);
+        selectVerse(nextOsis);
+      } finally {
+        setNavigatingVerse(false);
+      }
+    },
+    [selectedVerse, navigatingVerse, getChapter, onNavigateVerse, selectVerse]
+  );
 
   useEffect(() => {
     if (!selectedVerse) return;
@@ -140,27 +161,47 @@ export function ConcordancePanel({
   const rootStrongs = lexicon ? parseRootStrongs(lexicon.definition) : null;
 
   return (
-    <div className="flex h-full flex-col bg-stone-100/80">
-      <div className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-3">
-        <div>
+    <div className="flex h-full min-h-0 flex-col bg-stone-100/80">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-4 py-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
             Study
           </h2>
-          <p className="text-sm font-medium text-stone-800">
-            {verseLabelFromOsis(selectedVerse)}
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigateAdjacentVerse("prev")}
+              disabled={navigatingVerse}
+              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-lg text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
+              aria-label="Previous verse"
+            >
+              ‹
+            </button>
+            <p className="min-w-0 truncate text-sm font-medium text-stone-800">
+              {verseLabelFromOsis(selectedVerse)}
+            </p>
+            <button
+              type="button"
+              onClick={() => navigateAdjacentVerse("next")}
+              disabled={navigatingVerse}
+              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-lg text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
+              aria-label="Next verse"
+            >
+              ›
+            </button>
+          </div>
         </div>
         <button
           type="button"
           onClick={closeConcordance}
-          className="flex min-h-9 min-w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"
+          className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"
           aria-label="Close concordance"
         >
           ✕
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 md:p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3 md:p-4">
         <article className="overflow-hidden rounded-xl border border-sky-200/80 bg-white shadow-md ring-1 ring-sky-100">
           <header className="border-b border-sky-100 bg-gradient-to-r from-sky-50 to-white px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
@@ -245,7 +286,10 @@ export function ConcordancePanel({
                         <li key={`${occ.osisRef}-${index}`}>
                           <button
                             type="button"
-                            onClick={() => onNavigateVerse(occ.book, occ.chapter)}
+                            onClick={() => {
+                              onNavigateVerse(occ.book, occ.chapter, occ.osisRef);
+                              selectVerse(occ.osisRef);
+                            }}
                             className="w-full rounded-lg border border-stone-200 bg-white p-3 text-left transition hover:border-sky-300 hover:bg-sky-50"
                           >
                             <div className="flex items-center gap-2">
