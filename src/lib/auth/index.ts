@@ -1,6 +1,11 @@
 import { isSupabaseBackend } from "@/lib/config";
 import { getDevUser, signInDev, signOutDev } from "./dev";
-import { getSupabaseUser, signInWithEmail, signOutSupabase } from "./supabase-auth";
+import {
+  getSupabaseUser,
+  signInWithEmailPassword,
+  signOutSupabase,
+  signUpWithEmailPassword,
+} from "./supabase-auth";
 import type { AppUser } from "./types";
 
 export type { AppUser };
@@ -12,15 +17,32 @@ export async function getUser(): Promise<AppUser | null> {
   return getDevUser();
 }
 
+export async function signUp(
+  email: string,
+  password: string
+): Promise<{ user: AppUser | null; error: string | null }> {
+  if (!isSupabaseBackend()) {
+    return {
+      user: null,
+      error: "Account creation is only available with Supabase auth.",
+    };
+  }
+  return signUpWithEmailPassword(email, password);
+}
+
 export async function signIn(
-  credentials: { email: string } | { username: string; password: string }
-): Promise<{ user: AppUser | null; error: string | null; sent?: boolean }> {
+  credentials:
+    | { email: string; password: string }
+    | { username: string; password: string }
+): Promise<{ user: AppUser | null; error: string | null }> {
   if (isSupabaseBackend()) {
     if (!("email" in credentials)) {
-      return { user: null, error: "Email sign-in is required in production." };
+      return { user: null, error: "Email and password are required." };
     }
-    const { error } = await signInWithEmail(credentials.email);
-    return { user: null, error, sent: !error };
+    if (!credentials.password) {
+      return { user: null, error: "Email and password are required." };
+    }
+    return signInWithEmailPassword(credentials.email, credentials.password);
   }
 
   if (!("username" in credentials)) {

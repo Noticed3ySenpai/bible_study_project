@@ -2,16 +2,23 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getUser, isDevAuth, signIn, signOut, type AppUser } from "@/lib/auth";
+import {
+  getUser,
+  isDevAuth,
+  signIn,
+  signOut,
+  signUp,
+  type AppUser,
+} from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const devMode = isDevAuth();
   const [user, setUser] = useState<AppUser | null>(null);
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,12 +30,17 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await signIn({ email });
+
+    const result =
+      mode === "sign-up"
+        ? await signUp(email, password)
+        : await signIn({ email, password });
+
     setLoading(false);
     if (result.error) {
       setError(result.error);
-    } else if (result.sent) {
-      setSent(true);
+    } else if (result.user) {
+      router.push("/notes");
     }
   }
 
@@ -48,7 +60,6 @@ export default function LoginPage() {
   async function handleSignOut() {
     await signOut();
     setUser(null);
-    setSent(false);
   }
 
   if (user) {
@@ -85,7 +96,9 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="text-2xl font-bold text-stone-900">Sign In</h1>
+      <h1 className="text-2xl font-bold text-stone-900">
+        {devMode ? "Sign In" : mode === "sign-up" ? "Create Account" : "Sign In"}
+      </h1>
 
       {devMode ? (
         <>
@@ -131,35 +144,81 @@ export default function LoginPage() {
       ) : (
         <>
           <p className="mt-2 text-stone-600">
-            Use your email to sign in. We&apos;ll send you a magic link.
+            {mode === "sign-up"
+              ? "Create an account to save notes with Supabase."
+              : "Sign in with your Supabase account."}
           </p>
-          {sent ? (
-            <div className="mt-8 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-              Check your email for the sign-in link.
-            </div>
-          ) : (
-            <form onSubmit={handleProdSubmit} className="mt-8 space-y-4">
-              <label className="block text-sm font-medium text-stone-700">
-                Email
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full min-h-11 rounded-lg border border-stone-300 px-4 py-2 text-sm"
-                  placeholder="you@example.com"
-                />
-              </label>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full min-h-11 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
-              >
-                {loading ? "Sending…" : "Send Magic Link"}
-              </button>
-            </form>
-          )}
+          <div className="mt-6 flex gap-2 rounded-lg bg-stone-100 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("sign-in");
+                setError(null);
+              }}
+              className={`flex-1 min-h-10 rounded-md px-3 text-sm font-medium ${
+                mode === "sign-in"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-600"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("sign-up");
+                setError(null);
+              }}
+              className={`flex-1 min-h-10 rounded-md px-3 text-sm font-medium ${
+                mode === "sign-up"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-600"
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+          <form onSubmit={handleProdSubmit} className="mt-8 space-y-4">
+            <label className="block text-sm font-medium text-stone-700">
+              Email
+              <input
+                type="email"
+                required
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full min-h-11 rounded-lg border border-stone-300 px-4 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm font-medium text-stone-700">
+              Password
+              <input
+                type="password"
+                required
+                autoComplete={
+                  mode === "sign-up" ? "new-password" : "current-password"
+                }
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full min-h-11 rounded-lg border border-stone-300 px-4 py-2 text-sm"
+              />
+            </label>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full min-h-11 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+            >
+              {loading
+                ? mode === "sign-up"
+                  ? "Creating account…"
+                  : "Signing in…"
+                : mode === "sign-up"
+                  ? "Create Account"
+                  : "Sign In"}
+            </button>
+          </form>
         </>
       )}
     </div>
