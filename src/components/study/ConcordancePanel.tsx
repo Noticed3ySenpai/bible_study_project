@@ -221,6 +221,11 @@ export function ConcordancePanel({
                   <span className="rounded-md bg-sky-100 px-2 py-0.5 font-mono text-sm font-medium text-sky-900">
                     {lexicon.number}
                   </span>
+                  <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-stone-600">
+                    {lexicon.language === "hebrew" || lexicon.number.startsWith("H")
+                      ? "Hebrew"
+                      : "Greek"}
+                  </span>
                 </div>
                 {lexicon.morphology && (
                   <p className="mt-1.5 text-xs uppercase tracking-wide text-stone-500">
@@ -233,10 +238,8 @@ export function ConcordancePanel({
                 {loading
                   ? "Loading…"
                   : hasWordStudy
-                    ? lexicon
-                      ? null
-                      : "Tap a highlighted word below to see its Strong's entry."
-                    : "Word-level study is available in the New Testament."}
+                    ? "Tap a word below to see its Strong's entry."
+                    : "No word-level Strong's tags for this verse."}
               </p>
             )}
           </header>

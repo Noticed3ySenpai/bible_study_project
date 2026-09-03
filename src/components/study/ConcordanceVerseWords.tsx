@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useBibleDb, type VerseWord } from "@/lib/bible-db";
-import { alignVerseWords, type AlignedToken } from "@/lib/verse-alignment";
 import { useStudy } from "./StudyContext";
 
 function WordChip({
-  token,
+  word,
   active,
   onSelect,
 }: {
-  token: AlignedToken;
+  word: VerseWord;
   active: boolean;
   onSelect: () => void;
 }) {
@@ -18,13 +17,21 @@ function WordChip({
     <button
       type="button"
       onClick={onSelect}
-      className={`rounded-md px-1.5 py-0.5 text-sm transition ${
+      className={`rounded-md px-1.5 py-0.5 text-left text-sm transition ${
         active
           ? "bg-sky-600 text-white shadow-sm"
           : "bg-sky-50 text-sky-900 ring-1 ring-sky-200 hover:bg-sky-100"
       }`}
+      title={word.strongs}
     >
-      {token.text}
+      <span>{word.englishGloss}</span>
+      <span
+        className={`ml-1 font-mono text-[10px] ${
+          active ? "text-sky-100" : "text-sky-600/80"
+        }`}
+      >
+        {word.strongs}
+      </span>
     </button>
   );
 }
@@ -34,7 +41,6 @@ export function ConcordanceVerseWords({ osisRef }: { osisRef: string }) {
   const { ready, getVerse, getVerseWords } = useBibleDb();
   const [text, setText] = useState("");
   const [verseWords, setVerseWords] = useState<VerseWord[]>([]);
-  const [aligned, setAligned] = useState<AlignedToken[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,10 +53,8 @@ export function ConcordanceVerseWords({ osisRef }: { osisRef: string }) {
       const [verse, words] = await Promise.all([getVerse(osisRef), getVerseWords(osisRef)]);
       if (cancelled) return;
 
-      const verseText = verse?.text ?? "";
-      setText(verseText);
+      setText(verse?.text ?? "");
       setVerseWords(words);
-      setAligned(alignVerseWords(verseText, words));
       setLoading(false);
     }
 
@@ -65,7 +69,6 @@ export function ConcordanceVerseWords({ osisRef }: { osisRef: string }) {
   }
 
   const hasWordStudy = verseWords.length > 0;
-  const hoverableTokens = aligned.filter((t) => t.isHoverable && t.strongs);
 
   if (!hasWordStudy) {
     return <p className="font-serif text-sm leading-relaxed text-stone-700">{text}</p>;
@@ -75,14 +78,16 @@ export function ConcordanceVerseWords({ osisRef }: { osisRef: string }) {
     <div className="space-y-3">
       <p className="font-serif text-sm leading-relaxed text-stone-700">{text}</p>
       <div>
-        <p className="mb-2 text-xs font-medium text-stone-500">Tap a word to study</p>
+        <p className="mb-2 text-xs font-medium text-stone-500">
+          Tap a word to study ({verseWords.length})
+        </p>
         <div className="flex flex-wrap gap-1.5">
-          {hoverableTokens.map((token, i) => (
+          {verseWords.map((word) => (
             <WordChip
-              key={`${token.strongs}-${i}`}
-              token={token}
-              active={hoveredStrongs === token.strongs}
-              onSelect={() => setHoveredStrongs(token.strongs!)}
+              key={`${word.strongs}-${word.wordIndex}`}
+              word={word}
+              active={hoveredStrongs === word.strongs}
+              onSelect={() => setHoveredStrongs(word.strongs)}
             />
           ))}
         </div>

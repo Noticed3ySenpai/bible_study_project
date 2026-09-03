@@ -141,7 +141,7 @@ export function VerseText({
           </span>
         ))}
         {isActiveVerse && !hasWordStudy && (
-          <span className="ml-2 text-xs text-stone-400">(no word study)</span>
+          <span className="ml-2 text-xs text-stone-400">(no Strong&apos;s tags)</span>
         )}
       </p>
     </div>

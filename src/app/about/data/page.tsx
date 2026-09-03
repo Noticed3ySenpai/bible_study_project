@@ -25,8 +25,28 @@ export default function DataSourcesPage() {
         <section className="rounded-xl border border-stone-200 bg-white p-6">
           <h2 className="font-semibold text-stone-900">Strong&apos;s &amp; Word Study</h2>
           <p className="mt-2 text-sm text-stone-600">
-            Hebrew and Greek dictionary from gnosis; New Testament word occurrences from
-            STEPBible TAGNT. CC-BY license — attribution required.
+            Hebrew and Greek dictionary entries from gnosis. Word-level tagging for the whole Bible
+            comes from STEPBible:{" "}
+            <strong>TAHOT</strong> (Translators Amalgamated Hebrew OT) and{" "}
+            <strong>TAGNT</strong> (Translators Amalgamated Greek NT), created by{" "}
+            <a
+              href="https://www.stepbible.org"
+              className="text-amber-800 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              STEPBible.org
+            </a>{" "}
+            / Tyndale House Cambridge under{" "}
+            <a
+              href="https://creativecommons.org/licenses/by/4.0/"
+              className="text-amber-800 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              CC BY 4.0
+            </a>
+            . Attribution required.
           </p>
           <div className="mt-2 flex flex-col gap-1">
             <a
@@ -43,7 +63,7 @@ export default function DataSourcesPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              STEPBible/STEPBible-Data
+              STEPBible/STEPBible-Data (TAHOT + TAGNT)
             </a>
           </div>
         </section>

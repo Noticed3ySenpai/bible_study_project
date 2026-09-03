@@ -19,17 +19,29 @@ function normalizeWord(word: string): string {
   return word.toLowerCase().replace(/[^a-z0-9']/g, "");
 }
 
-function glossMatchesToken(gloss: string, token: string): boolean {
-  const g = normalizeWord(gloss);
-  const t = normalizeWord(token);
-  if (!g || !t) return false;
-  if (g === t) return true;
-  if (t.startsWith(g) || g.startsWith(t)) return true;
-  // Handle bracketed glosses like "[those] which [are]"
-  const glossWords = gloss.replace(/[[\]]/g, " ").split(/\s+/).map(normalizeWord).filter(Boolean);
-  return glossWords.some((gw) => gw === t || t.startsWith(gw) || gw.startsWith(t));
+function glossTokens(gloss: string): string[] {
+  return gloss
+    .replace(/[[\]<>]/g, " ")
+    .split(/[\s/]+/)
+    .map(normalizeWord)
+    .filter((w) => w.length > 0 && w !== "obj" && w !== "the" && w !== "a" && w !== "an");
 }
 
+function glossMatchesToken(gloss: string, token: string): boolean {
+  const t = normalizeWord(token);
+  if (!t) return false;
+
+  const g = normalizeWord(gloss);
+  if (g && (g === t || t.startsWith(g) || g.startsWith(t))) return true;
+
+  const words = glossTokens(gloss);
+  return words.some((gw) => gw === t || (gw.length > 2 && (t.startsWith(gw) || gw.startsWith(t))));
+}
+
+/**
+ * Best-effort map of WEB English tokens to Strong's-tagged glosses.
+ * Concordance chips should use verse_words directly; this is for in-text highlights.
+ */
 export function alignVerseWords(verseText: string, verseWords: VerseWord[]): AlignedToken[] {
   if (verseWords.length === 0) {
     return [{ text: verseText, leadingSpace: false, isHoverable: false }];
@@ -50,13 +62,30 @@ export function alignVerseWords(verseText: string, verseWords: VerseWord[]): Ali
   const strongsByToken = new Map<number, { strongs: string; wordIndex: number }>();
   const sortedWords = [...verseWords].sort((a, b) => a.wordIndex - b.wordIndex);
 
+  // Prefer sequential alignment: search forward from the last matched token.
+  let searchFrom = 0;
   for (const vw of sortedWords) {
-    for (let i = 0; i < tokens.length; i++) {
+    let matched = false;
+
+    for (let i = searchFrom; i < tokens.length; i++) {
       if (used.has(i)) continue;
       if (glossMatchesToken(vw.englishGloss, tokens[i].text)) {
         used.add(i);
         strongsByToken.set(i, { strongs: vw.strongs, wordIndex: vw.wordIndex });
+        searchFrom = i + 1;
+        matched = true;
         break;
+      }
+    }
+
+    if (!matched) {
+      for (let i = 0; i < searchFrom; i++) {
+        if (used.has(i)) continue;
+        if (glossMatchesToken(vw.englishGloss, tokens[i].text)) {
+          used.add(i);
+          strongsByToken.set(i, { strongs: vw.strongs, wordIndex: vw.wordIndex });
+          break;
+        }
       }
     }
   }
@@ -89,8 +118,13 @@ export function morphologyLabel(morphology: string | null): string {
     PREP: "Preposition",
     PRT: "Particle",
     "PRT-N": "Particle",
+    HR: "Hebrew particle/preposition",
+    HC: "Conjunction",
+    HTd: "Article",
+    HNcfsa: "Noun",
+    HVqp3ms: "Verb",
   };
-  const parts = morphology.split("-");
+  const parts = morphology.split(/[-\/]/);
   const pos = map[parts[0]] ?? parts[0];
   const details = parts.slice(1).join(", ");
   return details ? `${pos}, ${details}` : pos;

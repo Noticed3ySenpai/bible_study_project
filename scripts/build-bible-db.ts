@@ -129,12 +129,87 @@ function buildFts(db: Database.Database) {
   console.log("Built FTS5 index");
 }
 
-const TAGNT_MAT_JHN =
-  "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt";
-const TAGNT_ACT_REV =
-  "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt";
+const STEP_BASE =
+  "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT";
+
+const TAGNT_SOURCES = [
+  {
+    label: "TAGNT Mat-Jhn",
+    url: `${STEP_BASE}/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt`,
+    format: "tagnt" as const,
+  },
+  {
+    label: "TAGNT Act-Rev",
+    url: `${STEP_BASE}/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt`,
+    format: "tagnt" as const,
+  },
+];
+
+const TAHOT_SOURCES = [
+  {
+    label: "TAHOT Gen-Deu",
+    url: `${STEP_BASE}/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt`,
+    format: "tahot" as const,
+  },
+  {
+    label: "TAHOT Jos-Est",
+    url: `${STEP_BASE}/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt`,
+    format: "tahot" as const,
+  },
+  {
+    label: "TAHOT Job-Sng",
+    url: `${STEP_BASE}/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt`,
+    format: "tahot" as const,
+  },
+  {
+    label: "TAHOT Isa-Mal",
+    url: `${STEP_BASE}/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt`,
+    format: "tahot" as const,
+  },
+];
 
 const STEP_BOOK_TO_OSIS: Record<string, string> = {
+  // OT (TAHOT)
+  Gen: "Gen",
+  Exo: "Exod",
+  Lev: "Lev",
+  Num: "Num",
+  Deu: "Deut",
+  Jos: "Josh",
+  Jdg: "Judg",
+  Rut: "Ruth",
+  "1Sa": "1Sam",
+  "2Sa": "2Sam",
+  "1Ki": "1Kgs",
+  "2Ki": "2Kgs",
+  "1Ch": "1Chr",
+  "2Ch": "2Chr",
+  Ezr: "Ezra",
+  Neh: "Neh",
+  Est: "Esth",
+  Job: "Job",
+  Psa: "Ps",
+  Pro: "Prov",
+  Ecc: "Eccl",
+  Sng: "Song",
+  Isa: "Isa",
+  Jer: "Jer",
+  Lam: "Lam",
+  Ezk: "Ezek",
+  Dan: "Dan",
+  Hos: "Hos",
+  Jol: "Joel",
+  Amo: "Amos",
+  Oba: "Obad",
+  Jon: "Jonah",
+  Mic: "Mic",
+  Nam: "Nah",
+  Hab: "Hab",
+  Zep: "Zeph",
+  Hag: "Hag",
+  Zec: "Zech",
+  Mal: "Mal",
+  // NT (TAGNT)
   Mat: "Matt",
   Mrk: "Mark",
   Luk: "Luke",
@@ -168,6 +243,62 @@ function normalizeStrongsNumber(raw: string): string {
   const match = raw.match(/^([GH])(\d+)/i);
   if (!match) return raw.toUpperCase();
   return `${match[1].toUpperCase()}${Number(match[2])}`;
+}
+
+function cleanStepGloss(raw: string): string {
+  return raw
+    .replace(/<obj\.?>/gi, "⟦OBJ⟧")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[([^\]]+)\]/g, "$1")
+    .replace(/⟦OBJ⟧/g, "[obj.]")
+    .replace(/\//g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseTagntFields(cols: string[]): {
+  strongs: string;
+  morphology: string;
+  gloss: string;
+  lemma: string;
+  transliteration: string;
+} | null {
+  const gloss = cleanStepGloss(cols[2]?.trim() ?? "");
+  const strongsMorph = cols[3]?.trim() ?? "";
+  const strongsMorphMatch = strongsMorph.match(/^([GH]\d{1,5}[A-Za-z]*)=(.+)$/);
+  if (!strongsMorphMatch) return null;
+
+  const greekField = cols[1]?.trim() ?? "";
+  const lemmaMatch = greekField.match(/^(.+?)\s*\(([^)]+)\)/);
+  return {
+    strongs: normalizeStrongsNumber(strongsMorphMatch[1]),
+    morphology: strongsMorphMatch[2],
+    gloss,
+    lemma: lemmaMatch ? lemmaMatch[1].trim() : greekField,
+    transliteration: lemmaMatch ? lemmaMatch[2].trim() : "",
+  };
+}
+
+function parseTahotFields(cols: string[]): {
+  strongs: string;
+  morphology: string;
+  gloss: string;
+  lemma: string;
+  transliteration: string;
+} | null {
+  const dStrongs = cols[4]?.trim() ?? "";
+  const rootMatch = dStrongs.match(/\{([GH]\d+[A-Za-z]*)\}/);
+  if (!rootMatch) return null;
+
+  const hebrew = (cols[1]?.trim() ?? "").replace(/\\.*$/, "").replace(/\//g, "");
+  const gloss = cleanStepGloss(cols[3]?.trim() ?? "");
+  return {
+    strongs: normalizeStrongsNumber(rootMatch[1]),
+    morphology: cols[5]?.trim() ?? "",
+    gloss: gloss || normalizeStrongsNumber(rootMatch[1]),
+    lemma: hebrew,
+    transliteration: (cols[2]?.trim() ?? "").replace(/\//g, "."),
+  };
 }
 
 function importGnosisData(db: Database.Database, gnosisPath: string) {
@@ -226,9 +357,12 @@ function importGnosisData(db: Database.Database, gnosisPath: string) {
   gnosis.close();
 }
 
-async function importTagntData(db: Database.Database, url: string, label: string) {
-  const dest = join(TEMP_DIR, label.replace(/\W+/g, "_") + ".txt");
-  if (!existsSync(dest)) await download(url, dest);
+async function importStepTaggedText(
+  db: Database.Database,
+  source: { label: string; url: string; format: "tagnt" | "tahot" }
+) {
+  const dest = join(TEMP_DIR, source.label.replace(/\W+/g, "_") + ".txt");
+  if (!existsSync(dest)) await download(source.url, dest);
 
   const { readFileSync } = await import("fs");
   const lines = readFileSync(dest, "utf-8").split("\n");
@@ -243,6 +377,7 @@ async function importTagntData(db: Database.Database, url: string, label: string
 
   let occCount = 0;
   let wordCount = 0;
+  let skippedBooks = 0;
   const tx = db.transaction(() => {
     for (const line of lines) {
       const match = line.match(/^([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)#(\d+)/);
@@ -250,38 +385,43 @@ async function importTagntData(db: Database.Database, url: string, label: string
 
       const stepBook = match[1];
       const osisBook = STEP_BOOK_TO_OSIS[stepBook];
-      if (!osisBook) continue;
+      if (!osisBook) {
+        skippedBooks++;
+        continue;
+      }
 
       const chapter = Number(match[2]);
       const verse = Number(match[3]);
       const wordIndex = Number(match[4]);
       const osisRef = `${osisBook}.${chapter}.${verse}`;
-
       const cols = line.split("\t");
-      const gloss = cols[2]?.trim() ?? "";
-      const strongsMorph = cols[3]?.trim() ?? "";
-      const strongsMorphMatch = strongsMorph.match(/^([GH]\d{1,5})=(.+)$/);
-      if (!strongsMorphMatch) continue;
 
-      const strongs = normalizeStrongsNumber(strongsMorphMatch[1]);
-      const morphology = strongsMorphMatch[2];
+      const parsed =
+        source.format === "tahot" ? parseTahotFields(cols) : parseTagntFields(cols);
+      if (!parsed) continue;
 
-      const greekField = cols[1]?.trim() ?? "";
-      const lemmaMatch = greekField.match(/^(.+?)\s*\(([^)]+)\)/);
-      const lemma = lemmaMatch ? lemmaMatch[1].trim() : greekField;
-      const transliteration = lemmaMatch ? lemmaMatch[2].trim() : "";
-
-      insertOcc.run(strongs, osisBook, chapter, verse, wordIndex, osisRef);
+      insertOcc.run(parsed.strongs, osisBook, chapter, verse, wordIndex, osisRef);
       occCount++;
 
-      if (gloss) {
-        insertWord.run(osisRef, wordIndex, strongs, gloss, lemma, transliteration, morphology);
+      if (parsed.gloss) {
+        insertWord.run(
+          osisRef,
+          wordIndex,
+          parsed.strongs,
+          parsed.gloss,
+          parsed.lemma,
+          parsed.transliteration,
+          parsed.morphology
+        );
         wordCount++;
       }
     }
   });
   tx();
-  console.log(`Imported ${occCount} word occurrences and ${wordCount} verse words from ${label}`);
+  console.log(
+    `Imported ${occCount} word occurrences and ${wordCount} verse words from ${source.label}` +
+      (skippedBooks ? ` (${skippedBooks} lines skipped for unknown books)` : "")
+  );
 }
 
 async function importOpenBibleCrossRefs(db: Database.Database, zipPath: string) {
@@ -343,9 +483,27 @@ async function main() {
   importVerses(db, webDbPath);
   buildFts(db);
   importGnosisData(db, gnosisPath);
-  await importTagntData(db, TAGNT_MAT_JHN, "TAGNT Mat-Jhn");
-  await importTagntData(db, TAGNT_ACT_REV, "TAGNT Act-Rev");
+  for (const source of [...TAGNT_SOURCES, ...TAHOT_SOURCES]) {
+    await importStepTaggedText(db, source);
+  }
   await importOpenBibleCrossRefs(db, crossZipPath);
+
+  const otWords = db
+    .prepare(
+      `SELECT COUNT(*) as c FROM verse_words vw
+       JOIN verses v ON v.osis_ref = vw.osis_ref
+       WHERE v.book_id <= 39`
+    )
+    .get() as { c: number };
+  const ntWords = db
+    .prepare(
+      `SELECT COUNT(*) as c FROM verse_words vw
+       JOIN verses v ON v.osis_ref = vw.osis_ref
+       WHERE v.book_id >= 40`
+    )
+    .get() as { c: number };
+  console.log(`Verse words — OT: ${otWords.c}, NT: ${ntWords.c}`);
+
   db.close();
 
   const { statSync } = await import("fs");
