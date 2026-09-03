@@ -4,7 +4,9 @@ import { join } from "path";
 import { BOOK_BY_ID } from "../src/lib/bible-books";
 
 const OUTPUT_DIR = join(process.cwd(), "public", "data");
-const OUTPUT_PATH = join(OUTPUT_DIR, "bible-study.sqlite");
+const CORE_OUTPUT_PATH = join(OUTPUT_DIR, "bible-core.sqlite");
+const STUDY_OUTPUT_PATH = join(OUTPUT_DIR, "bible-study.sqlite");
+const VERSION_OUTPUT_PATH = join(OUTPUT_DIR, "bible-db-version.json");
 const TEMP_DIR = join(process.cwd(), ".cache", "bible-build");
 
 const MIDVASH_WEB_SQLITE =
@@ -24,7 +26,7 @@ async function download(url: string, dest: string) {
   console.log(`Saved ${dest} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
 }
 
-function createSchema(db: Database.Database) {
+function createCoreSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE verses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +59,11 @@ function createSchema(db: Database.Database) {
       transliteration TEXT,
       definition TEXT NOT NULL
     );
+  `);
+}
 
+function createStudySchema(db: Database.Database) {
+  db.exec(`
     CREATE TABLE word_occurrences (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       strongs TEXT NOT NULL,
@@ -301,7 +307,7 @@ function parseTahotFields(cols: string[]): {
   };
 }
 
-function importGnosisData(db: Database.Database, gnosisPath: string) {
+function importStrongs(db: Database.Database, gnosisPath: string) {
   const gnosis = new Database(gnosisPath, { readonly: true });
 
   const strongsRows = gnosis
@@ -332,6 +338,11 @@ function importGnosisData(db: Database.Database, gnosisPath: string) {
   });
   strongsTx();
   console.log(`Imported ${strongsRows.length} Strong's entries`);
+  gnosis.close();
+}
+
+function importGnosisCrossRefs(db: Database.Database, gnosisPath: string) {
+  const gnosis = new Database(gnosisPath, { readonly: true });
 
   const crossRows = gnosis
     .prepare(`
@@ -464,6 +475,33 @@ async function importOpenBibleCrossRefs(db: Database.Database, zipPath: string) 
   console.log(`Imported ${count} OpenBible cross-references`);
 }
 
+async function writeVersionManifest(files: { name: string; path: string }[]) {
+  const { createHash } = await import("crypto");
+  const { readFileSync, writeFileSync, statSync } = await import("fs");
+
+  const manifest = {
+    builtAt: new Date().toISOString(),
+    files: Object.fromEntries(
+      files.map(({ name, path }) => {
+        const buffer = readFileSync(path);
+        const hash = createHash("sha256").update(buffer).digest("hex").slice(0, 16);
+        return [
+          name,
+          {
+            hash,
+            bytes: statSync(path).size,
+            url: `/data/${name}`,
+          },
+        ];
+      })
+    ),
+  };
+
+  writeFileSync(VERSION_OUTPUT_PATH, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(`Wrote ${VERSION_OUTPUT_PATH}`);
+  return manifest;
+}
+
 async function main() {
   mkdirSync(TEMP_DIR, { recursive: true });
   mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -476,39 +514,65 @@ async function main() {
   if (!existsSync(gnosisPath)) await download(GNOSIS_LITE_DB, gnosisPath);
   if (!existsSync(crossZipPath)) await download(OPENBIBLE_CROSSREFS, crossZipPath);
 
-  if (existsSync(OUTPUT_PATH)) unlinkSync(OUTPUT_PATH);
-
-  const db = new Database(OUTPUT_PATH);
-  createSchema(db);
-  importVerses(db, webDbPath);
-  buildFts(db);
-  importGnosisData(db, gnosisPath);
-  for (const source of [...TAGNT_SOURCES, ...TAHOT_SOURCES]) {
-    await importStepTaggedText(db, source);
+  for (const path of [CORE_OUTPUT_PATH, STUDY_OUTPUT_PATH, VERSION_OUTPUT_PATH]) {
+    if (existsSync(path)) unlinkSync(path);
   }
-  await importOpenBibleCrossRefs(db, crossZipPath);
 
-  const otWords = db
-    .prepare(
-      `SELECT COUNT(*) as c FROM verse_words vw
-       JOIN verses v ON v.osis_ref = vw.osis_ref
-       WHERE v.book_id <= 39`
-    )
-    .get() as { c: number };
-  const ntWords = db
-    .prepare(
-      `SELECT COUNT(*) as c FROM verse_words vw
-       JOIN verses v ON v.osis_ref = vw.osis_ref
-       WHERE v.book_id >= 40`
-    )
-    .get() as { c: number };
-  console.log(`Verse words — OT: ${otWords.c}, NT: ${ntWords.c}`);
+  const coreDb = new Database(CORE_OUTPUT_PATH);
+  createCoreSchema(coreDb);
+  importVerses(coreDb, webDbPath);
+  buildFts(coreDb);
+  importStrongs(coreDb, gnosisPath);
+  coreDb.close();
 
-  db.close();
+  const studyDb = new Database(STUDY_OUTPUT_PATH);
+  createStudySchema(studyDb);
+  importGnosisCrossRefs(studyDb, gnosisPath);
+  for (const source of [...TAGNT_SOURCES, ...TAHOT_SOURCES]) {
+    await importStepTaggedText(studyDb, source);
+  }
+  await importOpenBibleCrossRefs(studyDb, crossZipPath);
+
+  const otCount = (
+    studyDb
+      .prepare(
+        `SELECT COUNT(*) as c FROM verse_words WHERE
+          osis_ref GLOB 'Gen.*' OR osis_ref GLOB 'Exod.*' OR osis_ref GLOB 'Lev.*' OR
+          osis_ref GLOB 'Num.*' OR osis_ref GLOB 'Deut.*' OR osis_ref GLOB 'Josh.*' OR
+          osis_ref GLOB 'Judg.*' OR osis_ref GLOB 'Ruth.*' OR osis_ref GLOB '1Sam.*' OR
+          osis_ref GLOB '2Sam.*' OR osis_ref GLOB '1Kgs.*' OR osis_ref GLOB '2Kgs.*' OR
+          osis_ref GLOB '1Chr.*' OR osis_ref GLOB '2Chr.*' OR osis_ref GLOB 'Ezra.*' OR
+          osis_ref GLOB 'Neh.*' OR osis_ref GLOB 'Esth.*' OR osis_ref GLOB 'Job.*' OR
+          osis_ref GLOB 'Ps.*' OR osis_ref GLOB 'Prov.*' OR osis_ref GLOB 'Eccl.*' OR
+          osis_ref GLOB 'Song.*' OR osis_ref GLOB 'Isa.*' OR osis_ref GLOB 'Jer.*' OR
+          osis_ref GLOB 'Lam.*' OR osis_ref GLOB 'Ezek.*' OR osis_ref GLOB 'Dan.*' OR
+          osis_ref GLOB 'Hos.*' OR osis_ref GLOB 'Joel.*' OR osis_ref GLOB 'Amos.*' OR
+          osis_ref GLOB 'Obad.*' OR osis_ref GLOB 'Jonah.*' OR osis_ref GLOB 'Mic.*' OR
+          osis_ref GLOB 'Nah.*' OR osis_ref GLOB 'Hab.*' OR osis_ref GLOB 'Zeph.*' OR
+          osis_ref GLOB 'Hag.*' OR osis_ref GLOB 'Zech.*' OR osis_ref GLOB 'Mal.*'`
+      )
+      .get() as { c: number }
+  ).c;
+  const totalWords = (
+    studyDb.prepare(`SELECT COUNT(*) as c FROM verse_words`).get() as { c: number }
+  ).c;
+  console.log(`Verse words — OT: ${otCount}, NT: ${totalWords - otCount}`);
+
+  studyDb.close();
 
   const { statSync } = await import("fs");
-  const size = statSync(OUTPUT_PATH).size;
-  console.log(`\nDone! Created ${OUTPUT_PATH} (${(size / 1024 / 1024).toFixed(2)} MB)`);
+  const manifest = await writeVersionManifest([
+    { name: "bible-core.sqlite", path: CORE_OUTPUT_PATH },
+    { name: "bible-study.sqlite", path: STUDY_OUTPUT_PATH },
+  ]);
+
+  console.log(
+    `\nDone! Core ${(statSync(CORE_OUTPUT_PATH).size / 1024 / 1024).toFixed(2)} MB, ` +
+      `Study ${(statSync(STUDY_OUTPUT_PATH).size / 1024 / 1024).toFixed(2)} MB`
+  );
+  console.log(
+    `Versions: core=${manifest.files["bible-core.sqlite"].hash} study=${manifest.files["bible-study.sqlite"].hash}`
+  );
 }
 
 main().catch((err) => {

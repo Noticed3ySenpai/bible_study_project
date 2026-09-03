@@ -1,0 +1,15 @@
+{
+  "builtAt": "2026-09-03T10:03:39.813Z",
+  "files": {
+    "bible-core.sqlite": {
+      "hash": "cd7633b0af7f8fb9",
+      "bytes": 10907648,
+      "url": "/data/bible-core.sqlite"
+    },
+    "bible-study.sqlite": {
+      "hash": "1cb42b6505ed663b",
+      "bytes": 90972160,
+      "url": "/data/bible-study.sqlite"
+    }
+  }
+}

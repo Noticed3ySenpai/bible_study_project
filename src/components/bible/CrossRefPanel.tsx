@@ -14,12 +14,13 @@ export function CrossRefPanel({
   osisRef: string;
   onClose: () => void;
 }) {
-  const { getCrossReferences } = useBibleDb();
+  const { studyReady, studyLoading, studyProgress, getCrossReferences } = useBibleDb();
   const [refs, setRefs] = useState<CrossRef[]>([]);
   const [loadedRef, setLoadedRef] = useState("");
-  const loading = loadedRef !== osisRef;
+  const loading = !studyReady || loadedRef !== osisRef;
 
   useEffect(() => {
+    if (!studyReady) return;
     let cancelled = false;
     getCrossReferences(osisRef).then((data) => {
       if (!cancelled) {
@@ -30,7 +31,7 @@ export function CrossRefPanel({
     return () => {
       cancelled = true;
     };
-  }, [osisRef, getCrossReferences]);
+  }, [osisRef, studyReady, getCrossReferences]);
 
   return (
     <div className="border-t border-stone-200 bg-stone-50 p-4 md:rounded-xl md:border md:shadow-sm">
@@ -46,7 +47,11 @@ export function CrossRefPanel({
         </button>
       </div>
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-stone-500">
+          {studyLoading || !studyReady
+            ? `Loading word study data… ${studyProgress}%`
+            : "Loading…"}
+        </p>
       ) : refs.length === 0 ? (
         <p className="text-sm text-stone-500">No cross-references found.</p>
       ) : (

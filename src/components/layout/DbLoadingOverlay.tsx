@@ -1,11 +1,23 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useBibleDb } from "@/lib/bible-db";
 
+const SCRIPTURE_ROUTE_PREFIXES = ["/", "/read", "/search"];
+
+function needsScriptureOverlay(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return SCRIPTURE_ROUTE_PREFIXES.some(
+    (prefix) => prefix !== "/" && pathname.startsWith(prefix)
+  );
+}
+
 export function DbLoadingOverlay() {
+  const pathname = usePathname();
   const { loading, progress, error } = useBibleDb();
 
-  if (!loading && !error) return null;
+  const showOverlay = Boolean(error) || (loading && needsScriptureOverlay(pathname));
+  if (!showOverlay) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 backdrop-blur-sm">
@@ -21,9 +33,9 @@ export function DbLoadingOverlay() {
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold">Loading Bible Database</h2>
+            <h2 className="text-lg font-semibold">Preparing Bible text</h2>
             <p className="mt-1 text-sm text-stone-500">
-              Downloading Scripture and concordance data…
+              Loading Scripture for reading and search…
             </p>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-200">
               <div

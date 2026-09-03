@@ -90,8 +90,15 @@ export function ConcordancePanel({
 }) {
   const { selectedVerse, hoveredStrongs, closeConcordance, setHoveredStrongs, selectVerse } =
     useStudy();
-  const { getLexiconEntry, getStrongsOccurrences, getCrossReferences, getVerseWords, getChapter } =
-    useBibleDb();
+  const {
+    studyReady,
+    studyProgress,
+    getLexiconEntry,
+    getStrongsOccurrences,
+    getCrossReferences,
+    getVerseWords,
+    getChapter,
+  } = useBibleDb();
 
   const [lexicon, setLexicon] = useState<LexiconEntry | null>(null);
   const [occurrences, setOccurrences] = useState<Verse[]>([]);
@@ -206,6 +213,18 @@ export function ConcordancePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y p-3 md:p-4">
+        {!studyReady ? (
+          <div className="rounded-xl border border-sky-200 bg-white p-4 text-sm text-stone-600">
+            <p className="font-medium text-stone-800">Loading word study data…</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200">
+              <div
+                className="h-full rounded-full bg-sky-600 transition-all duration-300"
+                style={{ width: `${studyProgress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-right text-xs text-stone-400">{studyProgress}%</p>
+          </div>
+        ) : (
         <article className="overflow-hidden rounded-xl border border-sky-200/80 bg-white shadow-md ring-1 ring-sky-100">
           <header className="border-b border-sky-100 bg-gradient-to-r from-sky-50 to-white px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
@@ -350,6 +369,7 @@ export function ConcordancePanel({
             )}
           </div>
         </article>
+        )}
       </div>
     </div>
   );

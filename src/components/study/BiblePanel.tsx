@@ -12,7 +12,8 @@ export function BiblePanel({
   bookId: number;
   chapter: number;
 }) {
-  const { ready, getChapter, getVerseWords } = useBibleDb();
+  const { ready, studyReady, studyLoading, studyProgress, getChapter, getVerseWords } =
+    useBibleDb();
   const { selectVerse, selectedVerse } = useStudy();
   const [verses, setVerses] = useState<Verse[]>([]);
   const [wordsByVerse, setWordsByVerse] = useState<Record<string, VerseWord[]>>({});
@@ -31,40 +32,60 @@ export function BiblePanel({
 
       setVerses(data);
       setLoadedKey(chapterKey);
-
-      const wordsMap: Record<string, VerseWord[]> = {};
-      await Promise.all(
-        data.map(async (v) => {
-          wordsMap[v.osisRef] = await getVerseWords(v.osisRef);
-        })
-      );
-      if (!cancelled) setWordsByVerse(wordsMap);
+      setWordsByVerse({});
     }
 
     load();
     return () => {
       cancelled = true;
     };
-  }, [ready, bookId, chapter, chapterKey, getChapter, getVerseWords]);
+  }, [ready, bookId, chapter, chapterKey, getChapter]);
+
+  useEffect(() => {
+    if (!ready || !studyReady || loadedKey !== chapterKey || verses.length === 0) return;
+    let cancelled = false;
+
+    async function loadWords() {
+      const wordsMap: Record<string, VerseWord[]> = {};
+      await Promise.all(
+        verses.map(async (v) => {
+          wordsMap[v.osisRef] = await getVerseWords(v.osisRef);
+        })
+      );
+      if (!cancelled) setWordsByVerse(wordsMap);
+    }
+
+    loadWords();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, studyReady, loadedKey, chapterKey, verses, getVerseWords]);
 
   return (
     <article className="h-full min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 md:px-6">
       {loading ? (
         <p className="text-stone-500">Loading chapter…</p>
       ) : (
-        <div className="mx-auto max-w-3xl space-y-2 font-serif">
-          {verses.map((v) => (
-            <VerseText
-              key={v.osisRef}
-              verseNumber={v.verse}
-              text={v.text}
-              osisRef={v.osisRef}
-              verseWords={wordsByVerse[v.osisRef] ?? []}
-              isSelected={selectedVerse === v.osisRef}
-              onSelectVerse={selectVerse}
-            />
-          ))}
-        </div>
+        <>
+          {studyLoading && !studyReady && (
+            <p className="mb-3 text-xs text-stone-400">
+              Loading word study data… {studyProgress}%
+            </p>
+          )}
+          <div className="mx-auto max-w-3xl space-y-2 font-serif">
+            {verses.map((v) => (
+              <VerseText
+                key={v.osisRef}
+                verseNumber={v.verse}
+                text={v.text}
+                osisRef={v.osisRef}
+                verseWords={wordsByVerse[v.osisRef] ?? []}
+                isSelected={selectedVerse === v.osisRef}
+                onSelectVerse={selectVerse}
+              />
+            ))}
+          </div>
+        </>
       )}
     </article>
   );

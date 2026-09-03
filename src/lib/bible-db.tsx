@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import type { Database, SqlValue } from "sql.js";
+import type { Database, SqlJsStatic, SqlValue } from "sql.js";
 
 export type Verse = {
   id: number;
@@ -41,6 +41,9 @@ type BibleDbContextValue = {
   loading: boolean;
   progress: number;
   error: string | null;
+  studyReady: boolean;
+  studyLoading: boolean;
+  studyProgress: number;
   getChapter: (bookId: number, chapter: number) => Promise<Verse[]>;
   getVerse: (osisRef: string) => Promise<Verse | null>;
   searchEnglish: (query: string, limit?: number) => Promise<SearchResult[]>;
@@ -53,63 +56,195 @@ type BibleDbContextValue = {
   getVerseOfDay: () => Promise<Verse | null>;
 };
 
+type DbVersionManifest = {
+  builtAt: string;
+  files: Record<string, { hash: string; bytes: number; url: string }>;
+};
+
 const BibleDbContext = createContext<BibleDbContextValue | null>(null);
 
-let dbInstance: Database | null = null;
-let initPromise: Promise<Database> | null = null;
+const IDB_NAME = "bible-db-cache";
+const IDB_STORE = "files";
+const CORE_FILE = "bible-core.sqlite";
+const STUDY_FILE = "bible-study.sqlite";
 
-async function initDb(onProgress?: (p: number) => void): Promise<Database> {
-  if (dbInstance) return dbInstance;
-  if (initPromise) return initPromise;
+let sqlPromise: Promise<SqlJsStatic> | null = null;
+let coreDb: Database | null = null;
+let studyDb: Database | null = null;
+let coreInitPromise: Promise<Database> | null = null;
+let studyInitPromise: Promise<Database> | null = null;
+let versionManifest: DbVersionManifest | null = null;
+let versionPromise: Promise<DbVersionManifest> | null = null;
 
-  initPromise = (async () => {
-    onProgress?.(5);
-
-    const initSqlJs = (await import("sql.js")).default;
-    const SQL = await initSqlJs({
-      locateFile: (file) => `/sql-wasm/${file}`,
-    });
-
-    onProgress?.(10);
-
-    const response = await fetch("/data/bible-study.sqlite");
-    if (!response.ok) {
-      throw new Error(
-        "Bible database not found. Run `npm run build:bible-db` first."
-      );
-    }
-
-    const total = Number(response.headers.get("content-length") ?? 0);
-    const reader = response.body?.getReader();
-    const chunks: Uint8Array[] = [];
-    let loaded = 0;
-
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.length;
-        if (total > 0) onProgress?.(10 + Math.round((loaded / total) * 80));
+function openCacheDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
       }
-    }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+  });
+}
 
-    onProgress?.(95);
-    const buffer = new Uint8Array(
-      chunks.reduce((acc, c) => acc + c.length, 0)
-    );
-    let offset = 0;
-    for (const chunk of chunks) {
-      buffer.set(chunk, offset);
-      offset += chunk.length;
-    }
+async function idbGet(key: string): Promise<ArrayBuffer | null> {
+  try {
+    const db = await openCacheDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as ArrayBuffer | undefined) ?? null);
+      req.onerror = () => reject(req.error ?? new Error("IndexedDB get failed"));
+    });
+  } catch {
+    return null;
+  }
+}
 
-    dbInstance = new SQL.Database(buffer);
-    onProgress?.(100);
-    return dbInstance;
-  })();
+async function idbSet(key: string, value: ArrayBuffer): Promise<void> {
+  try {
+    const db = await openCacheDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("IndexedDB put failed"));
+    });
+  } catch {
+    // Cache is best-effort.
+  }
+}
 
-  return initPromise;
+async function loadSqlJs(): Promise<SqlJsStatic> {
+  if (!sqlPromise) {
+    sqlPromise = (async () => {
+      const initSqlJs = (await import("sql.js")).default;
+      return initSqlJs({
+        locateFile: (file) => `/sql-wasm/${file}`,
+      });
+    })();
+  }
+  return sqlPromise;
+}
+
+async function getVersionManifest(): Promise<DbVersionManifest> {
+  if (versionManifest) return versionManifest;
+  if (!versionPromise) {
+    versionPromise = (async () => {
+      const response = await fetch("/data/bible-db-version.json", { cache: "no-cache" });
+      if (!response.ok) {
+        throw new Error("Bible database version manifest missing. Run npm run build:bible-db.");
+      }
+      const manifest = (await response.json()) as DbVersionManifest;
+      versionManifest = manifest;
+      return manifest;
+    })();
+  }
+  return versionPromise;
+}
+
+async function fetchSqliteBuffer(
+  url: string,
+  onProgress?: (ratio: number) => void
+): Promise<ArrayBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download ${url}. Run npm run build:bible-db first.`);
+  }
+
+  const total = Number(response.headers.get("content-length") ?? 0);
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const buffer = await response.arrayBuffer();
+    onProgress?.(1);
+    return buffer;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    if (total > 0) onProgress?.(loaded / total);
+  }
+
+  const merged = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  onProgress?.(1);
+  return merged.buffer;
+}
+
+async function loadDbFile(
+  fileName: string,
+  onProgress?: (p: number) => void
+): Promise<Database> {
+  const SQL = await loadSqlJs();
+  onProgress?.(8);
+
+  const manifest = await getVersionManifest();
+  const meta = manifest.files[fileName];
+  if (!meta) {
+    throw new Error(`Missing ${fileName} in bible-db-version.json`);
+  }
+
+  const cacheKey = `${fileName}:${meta.hash}`;
+  onProgress?.(12);
+
+  let buffer = await idbGet(cacheKey);
+  if (buffer) {
+    onProgress?.(90);
+  } else {
+    buffer = await fetchSqliteBuffer(meta.url, (ratio) => {
+      onProgress?.(12 + Math.round(ratio * 75));
+    });
+    await idbSet(cacheKey, buffer);
+  }
+
+  onProgress?.(95);
+  const db = new SQL.Database(new Uint8Array(buffer));
+  onProgress?.(100);
+  return db;
+}
+
+async function initCoreDb(onProgress?: (p: number) => void): Promise<Database> {
+  if (coreDb) return coreDb;
+  if (!coreInitPromise) {
+    coreInitPromise = loadDbFile(CORE_FILE, onProgress)
+      .then((db) => {
+        coreDb = db;
+        return db;
+      })
+      .catch((err) => {
+        coreInitPromise = null;
+        throw err;
+      });
+  }
+  return coreInitPromise;
+}
+
+async function initStudyDb(onProgress?: (p: number) => void): Promise<Database> {
+  if (studyDb) return studyDb;
+  if (!studyInitPromise) {
+    studyInitPromise = loadDbFile(STUDY_FILE, onProgress)
+      .then((db) => {
+        studyDb = db;
+        return db;
+      })
+      .catch((err) => {
+        studyInitPromise = null;
+        throw err;
+      });
+  }
+  return studyInitPromise;
 }
 
 function queryAll<T>(db: Database, sql: string, params: SqlValue[] = []): T[] {
@@ -168,21 +303,49 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [studyReady, setStudyReady] = useState(false);
+  const [studyLoading, setStudyLoading] = useState(false);
+  const [studyProgress, setStudyProgress] = useState(0);
+
+  const ensureStudyDb = useCallback(async () => {
+    if (studyDb) {
+      setStudyReady(true);
+      return studyDb;
+    }
+    setStudyLoading(true);
+    try {
+      const db = await initStudyDb((p) => setStudyProgress(p));
+      setStudyReady(true);
+      return db;
+    } finally {
+      setStudyLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    initDb(setProgress)
+    initCoreDb(setProgress)
       .then(() => {
         setReady(true);
         setLoading(false);
+        const prefetch = () => {
+          void ensureStudyDb().catch(() => {
+            /* prefetch is best-effort */
+          });
+        };
+        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+          window.requestIdleCallback(() => prefetch(), { timeout: 4000 });
+        } else {
+          setTimeout(prefetch, 1500);
+        }
       })
       .catch((err: Error) => {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [ensureStudyDb]);
 
   const getChapter = useCallback(async (bookId: number, chapter: number) => {
-    const db = await initDb();
+    const db = await initCoreDb();
     return queryAll<Verse>(
       db,
       `SELECT id, book, chapter, verse, text, osis_ref as osisRef
@@ -192,7 +355,7 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getVerse = useCallback(async (osisRef: string) => {
-    const db = await initDb();
+    const db = await initCoreDb();
     return queryOne<Verse>(
       db,
       `SELECT id, book, chapter, verse, text, osis_ref as osisRef FROM verses WHERE osis_ref = ?`,
@@ -201,7 +364,7 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const searchEnglish = useCallback(async (query: string, limit = 50) => {
-    const db = await initDb();
+    const db = await initCoreDb();
     const terms = query
       .trim()
       .replace(/['"]/g, "")
@@ -229,7 +392,7 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const searchStrongs = useCallback(async (query: string) => {
-    const db = await initDb();
+    const db = await initCoreDb();
     const q = query.trim().toUpperCase();
     if (!q) return [];
     if (/^[GH]\d+$/.test(q)) {
@@ -250,20 +413,28 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getStrongsOccurrences = useCallback(async (number: string) => {
-    const db = await initDb();
-    return queryAll<Verse>(
-      db,
-      `SELECT DISTINCT v.id, v.book, v.chapter, v.verse, v.text, v.osis_ref as osisRef
-       FROM word_occurrences w
-       JOIN verses v ON v.osis_ref = w.osis_ref
-       WHERE w.strongs = ?
-       ORDER BY v.book_id, v.chapter, v.verse`,
+    const study = await ensureStudyDb();
+    const core = await initCoreDb();
+    const refs = queryAll<{ osis_ref: string }>(
+      study,
+      `SELECT DISTINCT osis_ref FROM word_occurrences WHERE strongs = ? ORDER BY book, chapter, verse`,
       [number.toUpperCase()]
     );
-  }, []);
+
+    const results: Verse[] = [];
+    for (const ref of refs) {
+      const verse = queryOne<Verse>(
+        core,
+        `SELECT id, book, chapter, verse, text, osis_ref as osisRef FROM verses WHERE osis_ref = ?`,
+        [ref.osis_ref]
+      );
+      if (verse) results.push(verse);
+    }
+    return results;
+  }, [ensureStudyDb]);
 
   const getStrongsEntry = useCallback(async (number: string) => {
-    const db = await initDb();
+    const db = await initCoreDb();
     return queryOne<StrongsEntry>(
       db,
       `SELECT number, language, lemma, transliteration, definition FROM strongs WHERE number = ?`,
@@ -272,7 +443,7 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getVerseWords = useCallback(async (osisRef: string) => {
-    const db = await initDb();
+    const db = await ensureStudyDb();
     return queryAll<VerseWord>(
       db,
       `SELECT word_index as wordIndex, strongs, english_gloss as englishGloss,
@@ -280,13 +451,13 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
        FROM verse_words WHERE osis_ref = ? ORDER BY word_index`,
       [osisRef]
     );
-  }, []);
+  }, [ensureStudyDb]);
 
   const getLexiconEntry = useCallback(
     async (strongs: string, osisRef?: string) => {
-      const db = await initDb();
+      const core = await initCoreDb();
       const entry = queryOne<StrongsEntry>(
-        db,
+        core,
         `SELECT number, language, lemma, transliteration, definition FROM strongs WHERE number = ?`,
         [strongs.toUpperCase()]
       );
@@ -294,8 +465,9 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
 
       let morphology: string | null = null;
       if (osisRef) {
+        const study = await ensureStudyDb();
         const word = queryOne<{ morphology: string | null }>(
-          db,
+          study,
           `SELECT morphology FROM verse_words WHERE osis_ref = ? AND strongs = ? LIMIT 1`,
           [osisRef, strongs.toUpperCase()]
         );
@@ -304,13 +476,13 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
 
       return { ...entry, morphology };
     },
-    []
+    [ensureStudyDb]
   );
 
   const getCrossReferences = useCallback(async (osisRef: string) => {
-    const db = await initDb();
+    const study = await ensureStudyDb();
     const refs = queryAll<{ to_osis: string; weight: number }>(
-      db,
+      study,
       `SELECT to_osis, weight FROM cross_references WHERE from_osis = ? ORDER BY weight DESC LIMIT 20`,
       [osisRef]
     );
@@ -324,10 +496,10 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
       });
     }
     return results;
-  }, [getVerse]);
+  }, [ensureStudyDb, getVerse]);
 
   const getVerseOfDay = useCallback(async () => {
-    const db = await initDb();
+    const db = await initCoreDb();
     const today = new Date();
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
     const count = queryOne<{ c: number }>(db, `SELECT COUNT(*) as c FROM verses`);
@@ -347,6 +519,9 @@ export function BibleDbProvider({ children }: { children: React.ReactNode }) {
         loading,
         progress,
         error,
+        studyReady,
+        studyLoading,
+        studyProgress,
         getChapter,
         getVerse,
         searchEnglish,

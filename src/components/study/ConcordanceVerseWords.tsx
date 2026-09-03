@@ -38,60 +38,84 @@ function WordChip({
 
 export function ConcordanceVerseWords({ osisRef }: { osisRef: string }) {
   const { hoveredStrongs, setHoveredStrongs } = useStudy();
-  const { ready, getVerse, getVerseWords } = useBibleDb();
+  const { ready, studyReady, studyLoading, studyProgress, getVerse, getVerseWords } =
+    useBibleDb();
   const [text, setText] = useState("");
   const [verseWords, setVerseWords] = useState<VerseWord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingVerse, setLoadingVerse] = useState(true);
+  const [loadingWords, setLoadingWords] = useState(true);
 
   useEffect(() => {
     if (!ready) return;
 
     let cancelled = false;
-    setLoading(true);
+    setLoadingVerse(true);
 
-    async function load() {
-      const [verse, words] = await Promise.all([getVerse(osisRef), getVerseWords(osisRef)]);
+    async function loadVerse() {
+      const verse = await getVerse(osisRef);
       if (cancelled) return;
-
       setText(verse?.text ?? "");
-      setVerseWords(words);
-      setLoading(false);
+      setLoadingVerse(false);
     }
 
-    load();
+    loadVerse();
     return () => {
       cancelled = true;
     };
-  }, [ready, osisRef, getVerse, getVerseWords]);
+  }, [ready, osisRef, getVerse]);
 
-  if (loading) {
+  useEffect(() => {
+    if (!ready || !studyReady) return;
+
+    let cancelled = false;
+    setLoadingWords(true);
+
+    async function loadWords() {
+      const words = await getVerseWords(osisRef);
+      if (cancelled) return;
+      setVerseWords(words);
+      setLoadingWords(false);
+    }
+
+    loadWords();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, studyReady, osisRef, getVerseWords]);
+
+  if (loadingVerse) {
     return <p className="text-sm text-stone-500">Loading verse…</p>;
   }
 
+  const waitingForStudy = !studyReady || loadingWords;
   const hasWordStudy = verseWords.length > 0;
-
-  if (!hasWordStudy) {
-    return <p className="font-serif text-sm leading-relaxed text-stone-700">{text}</p>;
-  }
 
   return (
     <div className="space-y-3">
       <p className="font-serif text-sm leading-relaxed text-stone-700">{text}</p>
-      <div>
-        <p className="mb-2 text-xs font-medium text-stone-500">
-          Tap a word to study ({verseWords.length})
+      {waitingForStudy ? (
+        <p className="text-xs text-stone-400">
+          {studyLoading || !studyReady
+            ? `Loading word study data… ${studyProgress}%`
+            : "Loading word tags…"}
         </p>
-        <div className="flex flex-wrap gap-1.5">
-          {verseWords.map((word) => (
-            <WordChip
-              key={`${word.strongs}-${word.wordIndex}`}
-              word={word}
-              active={hoveredStrongs === word.strongs}
-              onSelect={() => setHoveredStrongs(word.strongs)}
-            />
-          ))}
+      ) : hasWordStudy ? (
+        <div>
+          <p className="mb-2 text-xs font-medium text-stone-500">
+            Tap a word to study ({verseWords.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {verseWords.map((word) => (
+              <WordChip
+                key={`${word.strongs}-${word.wordIndex}`}
+                word={word}
+                active={hoveredStrongs === word.strongs}
+                onSelect={() => setHoveredStrongs(word.strongs)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
