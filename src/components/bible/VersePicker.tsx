@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { BIBLE_BOOKS } from "@/lib/bible-books";
 
 export function VersePicker({
@@ -55,9 +56,10 @@ export function VersePicker({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-stone-400 hover:text-stone-600"
+          className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+          aria-label="Close"
         >
-          ✕
+          <XMarkIcon className="h-5 w-5" />
         </button>
       </div>
       <input

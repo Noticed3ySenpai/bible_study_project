@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { getAdjacentVerseOsis } from "@/lib/adjacent-verse";
 import { useBibleDb, type CrossRef, type LexiconEntry, type Verse } from "@/lib/bible-db";
 import { BOOK_BY_OSIS } from "@/lib/bible-books";
@@ -67,12 +73,10 @@ function CollapsibleStudyCard({
             <span className="ml-1.5 font-normal normal-case text-stone-400">({count})</span>
           )}
         </span>
-        <span
-          className={`text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}
+        <ChevronDownIcon
+          className={`h-4 w-4 text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden
-        >
-          ▾
-        </span>
+        />
       </button>
       {open && <div className="border-t border-stone-200 px-3 pb-3 pt-2">{children}</div>}
     </section>
@@ -172,10 +176,10 @@ export function ConcordancePanel({
               type="button"
               onClick={() => navigateAdjacentVerse("prev")}
               disabled={navigatingVerse}
-              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-lg text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
+              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
               aria-label="Previous verse"
             >
-              ‹
+              <ChevronLeftIcon className="h-5 w-5" />
             </button>
             <p className="min-w-0 truncate text-sm font-medium text-stone-800">
               {verseLabelFromOsis(selectedVerse)}
@@ -184,10 +188,10 @@ export function ConcordancePanel({
               type="button"
               onClick={() => navigateAdjacentVerse("next")}
               disabled={navigatingVerse}
-              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-lg text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
+              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 disabled:opacity-50 md:hidden"
               aria-label="Next verse"
             >
-              ›
+              <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -197,7 +201,7 @@ export function ConcordancePanel({
           className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"
           aria-label="Close concordance"
         >
-          ✕
+          <XMarkIcon className="h-5 w-5" />
         </button>
       </div>
 

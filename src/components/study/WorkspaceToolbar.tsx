@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { ChapterNav } from "@/components/bible/ChapterNav";
 import { useStudy } from "./StudyContext";
 
@@ -83,14 +84,15 @@ export function WorkspaceToolbar({
             <button
               type="button"
               onClick={toggleBible}
-              className={`min-h-9 rounded-lg px-3 text-sm font-medium transition ${
+              className={`flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
                 bibleOpen
                   ? "bg-amber-100 text-amber-900"
                   : "border border-stone-300 text-stone-700 hover:bg-stone-50"
               }`}
+              aria-label="Toggle Bible panel"
             >
+              <BookOpenIcon className="h-5 w-5" aria-hidden />
               <span className="hidden sm:inline">Bible</span>
-              <span className="sm:hidden">📖</span>
             </button>
           )}
           {!showBibleToggle && (

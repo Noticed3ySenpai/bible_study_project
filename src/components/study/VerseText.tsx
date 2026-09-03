@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import type { VerseWord } from "@/lib/bible-db";
 import { BOOK_BY_OSIS } from "@/lib/bible-books";
 import { alignVerseWords, type AlignedToken } from "@/lib/verse-alignment";
@@ -113,7 +114,11 @@ export function VerseText({
           }`}
           aria-label={`Insert ${osisRef} into note`}
         >
-          {inserted ? "✓" : "←"}
+          {inserted ? (
+            <CheckIcon className="h-4 w-4" aria-hidden />
+          ) : (
+            <ArrowLeftIcon className="h-4 w-4" aria-hidden />
+          )}
         </button>
       )}
       <p

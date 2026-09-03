@@ -56,20 +56,18 @@ function NoteStudyLayoutInner({
       <WorkspaceToolbar
         title={noteTitle}
         subtitle="Notes"
-        bookOsis={book.osis}
-        bookName={book.name}
-        chapter={bibleLoc.chapter}
-        maxChapter={book.chapters}
         showBibleToggle
-        embeddedNav
-        onChapterChange={handleChapterChange}
         onDelete={onDelete}
         deleting={deleting}
       />
       <WorkspacePanels
         bibleBookId={book.id}
         bibleChapter={bibleLoc.chapter}
+        bibleBookOsis={book.osis}
+        bibleBookName={book.name}
+        bibleMaxChapter={book.chapters}
         onNavigateVerse={handleNavigateVerse}
+        onChapterChange={handleChapterChange}
         notesPanel={<div className="flex h-full min-h-0 flex-col">{children}</div>}
       />
     </div>

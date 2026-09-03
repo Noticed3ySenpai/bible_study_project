@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  BookOpenIcon,
+  DocumentTextIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/outline";
 import { useBibleDb } from "@/lib/bible-db";
 import { BOOK_BY_OSIS } from "@/lib/bible-books";
 import { formatVerseRef } from "@/lib/verse-ref";
@@ -39,7 +45,7 @@ export default function HomePage() {
           href="/read/john/3"
           className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow"
         >
-          <span className="text-2xl">📖</span>
+          <BookOpenIcon className="h-7 w-7 text-amber-800" aria-hidden />
           <h2 className="mt-2 font-semibold">Read Bible</h2>
           <p className="mt-1 text-sm text-stone-500">Browse all 66 books</p>
         </Link>
@@ -47,7 +53,7 @@ export default function HomePage() {
           href="/search"
           className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow"
         >
-          <span className="text-2xl">🔍</span>
+          <MagnifyingGlassIcon className="h-7 w-7 text-amber-800" aria-hidden />
           <h2 className="mt-2 font-semibold">Concordance</h2>
           <p className="mt-1 text-sm text-stone-500">English & Strong&apos;s search</p>
         </Link>
@@ -55,7 +61,7 @@ export default function HomePage() {
           href="/notes"
           className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow"
         >
-          <span className="text-2xl">📝</span>
+          <DocumentTextIcon className="h-7 w-7 text-amber-800" aria-hidden />
           <h2 className="mt-2 font-semibold">Study Notes</h2>
           <p className="mt-1 text-sm text-stone-500">BlockNote editor with verse chips</p>
         </Link>
@@ -63,7 +69,7 @@ export default function HomePage() {
           href="/notes/new"
           className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:border-amber-300 hover:shadow"
         >
-          <span className="text-2xl">✏️</span>
+          <PencilSquareIcon className="h-7 w-7 text-amber-800" aria-hidden />
           <h2 className="mt-2 font-semibold text-amber-900">New Note</h2>
           <p className="mt-1 text-sm text-amber-700">Start a fresh study session</p>
         </Link>

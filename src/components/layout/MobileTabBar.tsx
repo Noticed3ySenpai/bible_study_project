@@ -2,13 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ComponentType, SVGProps } from "react";
+import {
+  BookOpenIcon,
+  DocumentTextIcon,
+  HomeIcon,
+  MagnifyingGlassIcon,
+  UserIcon,
+} from "@heroicons/react/24/outline";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: "⌂" },
-  { href: "/read/gen/1", label: "Read", icon: "📖" },
-  { href: "/search", label: "Search", icon: "🔍" },
-  { href: "/notes", label: "Notes", icon: "📝" },
-  { href: "/login", label: "Account", icon: "👤" },
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+
+const NAV_ITEMS: { href: string; label: string; icon: IconComponent }[] = [
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/read/gen/1", label: "Read", icon: BookOpenIcon },
+  { href: "/search", label: "Search", icon: MagnifyingGlassIcon },
+  { href: "/notes", label: "Notes", icon: DocumentTextIcon },
+  { href: "/login", label: "Account", icon: UserIcon },
 ];
 
 export function MobileTabBar() {
@@ -22,6 +32,7 @@ export function MobileTabBar() {
             item.href === "/"
               ? pathname === "/"
               : pathname.startsWith(item.href.split("/").slice(0, 2).join("/") || item.href);
+          const Icon = item.icon;
           return (
             <Link
               key={item.href}
@@ -30,7 +41,7 @@ export function MobileTabBar() {
                 active ? "text-amber-800" : "text-stone-500"
               }`}
             >
-              <span className="text-lg leading-none">{item.icon}</span>
+              <Icon className="h-5 w-5" aria-hidden />
               <span>{item.label}</span>
             </Link>
           );

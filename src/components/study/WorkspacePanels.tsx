@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { ChapterNav } from "@/components/bible/ChapterNav";
 import { BiblePanel } from "./BiblePanel";
 import { ConcordancePanel } from "./ConcordancePanel";
 import { useStudy } from "./StudyContext";
@@ -54,7 +55,7 @@ function MobilePanelSheet({
         <div className="flex shrink-0 justify-center py-2">
           <div className="h-1 w-10 rounded-full bg-stone-300" />
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden overscroll-contain touch-pan-y">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain touch-pan-y">
           {children}
         </div>
       </div>
@@ -65,14 +66,22 @@ function MobilePanelSheet({
 export function WorkspacePanels({
   bibleBookId,
   bibleChapter,
+  bibleBookOsis,
+  bibleBookName,
+  bibleMaxChapter,
   showBible = true,
   onNavigateVerse,
+  onChapterChange,
   notesPanel,
 }: {
   bibleBookId: number;
   bibleChapter: number;
+  bibleBookOsis?: string;
+  bibleBookName?: string;
+  bibleMaxChapter?: number;
   showBible?: boolean;
   onNavigateVerse: (book: string, chapter: number, osisRef?: string) => void;
+  onChapterChange?: (chapter: number, bookOsis: string) => void;
   notesPanel?: React.ReactNode;
 }) {
   const { bibleOpen, concordanceOpen, closeBible, closeConcordance } = useStudy();
@@ -87,6 +96,24 @@ export function WorkspacePanels({
       : openPanelCount === 2
         ? "min-w-0 flex-1"
         : "min-w-0 flex-1 md:max-w-[40%]";
+
+  const showInlineBibleNav = Boolean(
+    notesPanel && onChapterChange && bibleBookOsis && bibleBookName && bibleMaxChapter
+  );
+
+  function renderBibleNav() {
+    if (!showInlineBibleNav) return null;
+    return (
+      <ChapterNav
+        bookOsis={bibleBookOsis!}
+        bookName={bibleBookName!}
+        chapter={bibleChapter}
+        maxChapter={bibleMaxChapter!}
+        embedded
+        onChapterChange={onChapterChange}
+      />
+    );
+  }
 
   return (
     <>
@@ -103,11 +130,14 @@ export function WorkspacePanels({
 
         {bibleVisible && (
           <section
-            className={`${panelWidth} min-h-0 overflow-hidden ${
-              notesPanel ? "hidden md:block" : ""
+            className={`${panelWidth} flex min-h-0 flex-col overflow-hidden ${
+              notesPanel ? "hidden md:flex" : ""
             } ${concordanceOpen ? "border-r border-stone-200" : ""}`}
           >
-            <BiblePanel bookId={bibleBookId} chapter={bibleChapter} />
+            {renderBibleNav()}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <BiblePanel bookId={bibleBookId} chapter={bibleChapter} />
+            </div>
           </section>
         )}
 
@@ -120,7 +150,10 @@ export function WorkspacePanels({
 
       {notesPanel && (
         <MobilePanelSheet open={bibleOpen} onClose={closeBible}>
-          <BiblePanel bookId={bibleBookId} chapter={bibleChapter} />
+          {renderBibleNav()}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <BiblePanel bookId={bibleBookId} chapter={bibleChapter} />
+          </div>
         </MobilePanelSheet>
       )}
 
