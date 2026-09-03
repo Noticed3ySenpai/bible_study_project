@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { ChapterNav } from "@/components/bible/ChapterNav";
 import { useStudy } from "./StudyContext";
@@ -15,6 +16,7 @@ export function WorkspaceToolbar({
   showBibleToggle = false,
   embeddedNav = false,
   onChapterChange,
+  onTitleChange,
   onDelete,
   deleting = false,
 }: {
@@ -27,6 +29,7 @@ export function WorkspaceToolbar({
   showBibleToggle?: boolean;
   embeddedNav?: boolean;
   onChapterChange?: (chapter: number, bookOsis: string) => void;
+  onTitleChange?: (title: string) => void;
   onDelete?: () => void;
   deleting?: boolean;
 }) {
@@ -38,12 +41,26 @@ export function WorkspaceToolbar({
     selectedVerse,
     openConcordance,
   } = useStudy();
+  const [draftTitle, setDraftTitle] = useState(title);
+
+  useEffect(() => {
+    setDraftTitle(title);
+  }, [title]);
 
   const handleToggleConcordance = () => {
     if (concordanceOpen) {
       closeConcordance();
     } else if (selectedVerse) {
       openConcordance(selectedVerse);
+    }
+  };
+
+  const commitTitle = () => {
+    if (!onTitleChange) return;
+    const next = draftTitle.trim() || "Untitled";
+    setDraftTitle(next);
+    if (next !== title) {
+      onTitleChange(next);
     }
   };
 
@@ -57,7 +74,7 @@ export function WorkspaceToolbar({
   return (
     <div className="border-b border-stone-200 bg-white">
       <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {subtitle && (
             <p className="text-xs text-stone-500">
               <Link href="/" className="hover:text-stone-700">
@@ -67,7 +84,24 @@ export function WorkspaceToolbar({
               <span>{subtitle}</span>
             </p>
           )}
-          <h1 className="truncate text-lg font-semibold text-stone-900">{title}</h1>
+          {onTitleChange ? (
+            <input
+              type="text"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="Untitled"
+              aria-label="Note title"
+              className="mt-0.5 w-full min-w-0 truncate rounded-md border border-transparent bg-transparent px-1 py-0.5 text-lg font-semibold text-stone-900 outline-none placeholder:text-stone-400 hover:border-stone-200 focus:border-amber-400 focus:bg-white focus:ring-1 focus:ring-amber-400"
+            />
+          ) : (
+            <h1 className="truncate text-lg font-semibold text-stone-900">{title}</h1>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {onDelete && (

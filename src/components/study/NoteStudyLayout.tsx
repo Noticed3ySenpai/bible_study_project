@@ -21,11 +21,13 @@ function loadBibleLocation() {
 
 function NoteStudyLayoutInner({
   noteTitle,
+  onTitleChange,
   onDelete,
   deleting = false,
   children,
 }: {
   noteTitle: string;
+  onTitleChange?: (title: string) => void;
   onDelete?: () => void;
   deleting?: boolean;
   children: React.ReactNode;
@@ -57,6 +59,7 @@ function NoteStudyLayoutInner({
         title={noteTitle}
         subtitle="Notes"
         showBibleToggle
+        onTitleChange={onTitleChange}
         onDelete={onDelete}
         deleting={deleting}
       />
@@ -76,18 +79,25 @@ function NoteStudyLayoutInner({
 
 export function NoteStudyLayout({
   noteTitle,
+  onTitleChange,
   onDelete,
   deleting = false,
   children,
 }: {
   noteTitle: string;
+  onTitleChange?: (title: string) => void;
   onDelete?: () => void;
   deleting?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <StudyProvider initialBibleOpen={false}>
-      <NoteStudyLayoutInner noteTitle={noteTitle} onDelete={onDelete} deleting={deleting}>
+      <NoteStudyLayoutInner
+        noteTitle={noteTitle}
+        onTitleChange={onTitleChange}
+        onDelete={onDelete}
+        deleting={deleting}
+      >
         {children}
       </NoteStudyLayoutInner>
     </StudyProvider>

@@ -55,11 +55,38 @@ export default function NoteEditorPage({
       const user = await getUser();
       if (!user) return;
 
-      const title = extractTitleFromContent(content);
+      // Keep a manually set title; only derive from content while still Untitled.
+      const title =
+        note.title.trim() && note.title !== "Untitled"
+          ? note.title
+          : extractTitleFromContent(content);
       const verseRefs = extractVerseRefsFromContent(content);
       const updated = await saveNote(note.id, user.id, {
         title,
         content,
+        verseRefs,
+      });
+
+      if (updated) {
+        setNote(updated);
+      }
+    },
+    [note]
+  );
+
+  const handleTitleChange = useCallback(
+    async (title: string) => {
+      if (!note) return;
+      const nextTitle = title.trim() || "Untitled";
+      setNote((current) => (current ? { ...current, title: nextTitle } : current));
+
+      const user = await getUser();
+      if (!user) return;
+
+      const verseRefs = extractVerseRefsFromContent(note.content);
+      const updated = await saveNote(note.id, user.id, {
+        title: nextTitle,
+        content: note.content,
         verseRefs,
       });
 
@@ -95,7 +122,12 @@ export default function NoteEditorPage({
   }
 
   return (
-    <NoteStudyLayout noteTitle={note.title} onDelete={handleDelete} deleting={deleting}>
+    <NoteStudyLayout
+      noteTitle={note.title}
+      onTitleChange={handleTitleChange}
+      onDelete={handleDelete}
+      deleting={deleting}
+    >
       <StudyEditor initialContent={note.content} onSaveContent={handleSave} />
     </NoteStudyLayout>
   );

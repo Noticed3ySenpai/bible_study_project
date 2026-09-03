@@ -113,6 +113,57 @@ export default function StudyEditor({
     };
   }, [study, insertVerse, insertVerseBlock]);
 
+  // Notion-style mobile: show + / drag handles for the focused block.
+  // BlockNote's default SideMenu is hover-only and hides on keydown, which
+  // doesn't work well on touch devices.
+  useEffect(() => {
+    if (!editable || typeof window === "undefined") return;
+
+    const isTouchUi =
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 767px)").matches;
+    if (!isTouchUi) return;
+
+    const showSideMenuForCursorBlock = () => {
+      if (!editor.isFocused()) return;
+
+      try {
+        const { block } = editor.getTextCursorPosition();
+        const blockEl = editor.domElement?.querySelector(
+          `[data-id="${CSS.escape(block.id)}"]`
+        ) as HTMLElement | null;
+        if (!blockEl) return;
+
+        const rect = blockEl.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        blockEl.dispatchEvent(
+          new MouseEvent("mousemove", {
+            clientX: rect.left + 12,
+            clientY: rect.top + Math.min(20, Math.max(8, rect.height / 2)),
+            bubbles: true,
+            cancelable: true,
+            view: window,
+          })
+        );
+      } catch {
+        // Cursor can briefly be in an invalid position during edits.
+      }
+    };
+
+    const scheduleShow = () => {
+      requestAnimationFrame(showSideMenuForCursorBlock);
+    };
+
+    const unsubscribe = editor.onSelectionChange(scheduleShow);
+    editor.domElement?.addEventListener("focusin", scheduleShow);
+
+    return () => {
+      unsubscribe();
+      editor.domElement?.removeEventListener("focusin", scheduleShow);
+    };
+  }, [editor, editable]);
+
   const getVerseSuggestions = useCallback(
   async (query: string) => {
     const q = query.toLowerCase();

@@ -49,6 +49,15 @@
   z-index: 30;
 }
 
+/* Touch / mobile: keep side-menu controls easy to hit */
+@media (pointer: coarse), (max-width: 767px) {
+  .study-editor .bn-side-menu button,
+  .study-editor .bn-side-menu [role="button"] {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+  }
+}
+
 .study-editor .verse-chip {
   display: inline-flex;
   align-items: center;
